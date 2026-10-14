@@ -7,11 +7,11 @@ import pandas as pd
 import streamlit as st
 import tensorflow as tf
 import yfinance as yf
+from keras.callbacks import EarlyStopping
+from keras.layers import LSTM, Dense, Input
+from keras.models import Sequential
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.layers import LSTM, Dense, Input
-from tensorflow.keras.models import Sequential
 
 st.set_page_config(page_title="Dự báo giá cổ phiếu bằng LSTM", layout="wide")
 st.title("📈 Dự báo giá cổ phiếu bằng LSTM")
@@ -31,7 +31,7 @@ run = st.sidebar.button("🚀 Huấn luyện & dự báo", type="primary")
 @st.cache_data(show_spinner="Đang tải dữ liệu...")
 def load_data(ticker, start):
     df = yf.download(ticker, start=str(start), end=str(date.today()), progress=False)
-    if isinstance(df.columns, pd.MultiIndex):  # yfinance bản mới trả về MultiIndex
+    if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     return df[["Close"]].dropna()
 
@@ -151,22 +151,3 @@ for _ in range(n_future):
     nxt = model.predict(last_window, verbose=0)
     future.append(nxt[0, 0])
     last_window = np.append(last_window[:, 1:, :], nxt.reshape(1, 1, 1), axis=1)
-
-future = scaler.inverse_transform(np.array(future).reshape(-1, 1))
-future_dates = pd.bdate_range(df.index[-1] + pd.Timedelta(days=1), periods=n_future)
-future_df = pd.DataFrame({"Ngày": future_dates.date, "Giá dự báo": future.flatten().round(2)})
-
-st.subheader(f"Dự báo {n_future} ngày tới")
-col_c, col_d = st.columns([1, 2])
-col_c.dataframe(future_df, hide_index=True)
-
-with col_d:
-    fig3, ax3 = plt.subplots(figsize=(8, 4))
-    ax3.plot(y_test_real, label="Giá thật")
-    ax3.plot(test_pred, label="Dự báo test")
-    ax3.plot(range(len(y_test_real), len(y_test_real) + n_future),
-             future, marker="o", label=f"{n_future} ngày tới")
-    ax3.legend()
-    st.pyplot(fig3)
-
-st.caption("⚠️ Chỉ dùng cho mục đích học tập, không phải khuyến nghị đầu tư.")
